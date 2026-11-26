@@ -64,7 +64,7 @@ Be aware of these before using ImaPort for critical work:
 - **Upscaling beyond 400%** is not offered in Scale mode (use Custom px for more), and upscaling never adds detail - the result is interpolated.
 - **Color profile and EXIF metadata are not preserved.** The conversion pipeline uses the Canvas API, which strips most metadata and does not apply ICC profile transforms.
 - **JPEG quality is approximate.** The quality slider maps to the browser encoder's internal scale; results differ slightly between browsers.
-- **Very large images** may fail on memory-constrained devices (e.g., big panoramas on old phones) because canvas size limits vary per browser.
+- **Very large images**: canvas size limits vary per browser and device. ImaPort clamps both the decoded source and the resize target to 16.7 megapixels (4096x4096); larger requests are proportionally scaled down instead of failing or producing blank output.
 - **HEIC input** generally does not work, since most browsers cannot decode HEIC.
 - **ICO input** support depends on the browser; many browsers decode standard ICO files, but not all.
 
@@ -80,14 +80,17 @@ Be aware of these before using ImaPort for critical work:
 - **"Browser could not decode this file"**: the image format is not supported by your browser (common with HEIC). Try a different browser or convert the file to PNG/JPG first.
 - **"Encoding failed"**: the browser refused to encode (rare). Try a different output format.
 - **Custom resize seems ignored**: if both W and H are empty, the original size is kept; with Keep aspect ratio on, your values are a maximum box, not exact output size.
+- **Output dimensions smaller than requested**: a safeguard clamps very large outputs to 16.7 megapixels to stay within device canvas limits.
 - **Downloaded file has no extension**: some mobile browsers save files by the page title; rename it and add `.png`, `.jpg`, or `.webp`.
 - **Output is larger than the original**: normal when converting a well-compressed JPG to PNG (lossless), or when raising the quality slider. Lower the quality or pick WEBP.
 
 ## Technical Notes
 
-- Single file: HTML + inline CSS + vanilla ES2017 JavaScript (~21 KB, no build step).
+- Single file: HTML + inline CSS + vanilla ES2017 JavaScript (~22 KB, no build step).
 - Decode via `Image` + object URLs; encode via `canvas.toBlob(mime, quality)`.
 - Resize (when enabled) runs as a high-quality image-smoothing pass on a second canvas before encoding.
+- Both decode and resize are clamped to 16.7 megapixels to respect mobile canvas area limits.
+- Layout uses `100dvh` (with `100vh` fallback) so it survives iOS Safari rotation and toolbar collapse.
 - JPG output composites onto a background color first, since JPEG has no alpha channel.
 - Works from `file://` - no server required.
 

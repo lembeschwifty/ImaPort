@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="color-scheme" content="dark" />
     <title>ImaPort - Image File Converter</title>
     <style>
@@ -12,6 +12,7 @@
         color: #e2e8f0;
         background: linear-gradient(135deg, #020617 0%, #0f172a 50%, #1e1b4b 100%);
         min-height: 100vh;
+        min-height: 100dvh; /* dynamic viewport: fixes layout after iOS Safari rotation */
       }
       .wrap { max-width: 780px; margin: 0 auto; padding: 32px 16px 48px; }
       h1 { font-size: clamp(1.6rem, 4vw, 2.3rem); font-weight: 700; letter-spacing: -0.02em; }
@@ -196,6 +197,14 @@
           if (FORMATS[i].value === state.format) return FORMATS[i];
       }
 
+      /* iOS Safari and older devices fail silently on canvases above this area */
+      var MAX_AREA = 16777216; /* 4096 x 4096 */
+      function clampArea(w, h) {
+        if (w * h <= MAX_AREA) return { w: w, h: h };
+        var s = Math.sqrt(MAX_AREA / (w * h));
+        return { w: Math.max(1, Math.floor(w * s)), h: Math.max(1, Math.floor(h * s)) };
+      }
+
       /* ---------- decode ---------- */
       function loadImage(file) {
         return new Promise(function (resolve, reject) {
@@ -212,6 +221,8 @@
               } else {
                 w = img.naturalWidth; h = img.naturalHeight;
               }
+              var cd = clampArea(w, h); /* protect against device canvas limits */
+              w = cd.w; h = cd.h;
               canvas = document.createElement("canvas");
               canvas.width = w; canvas.height = h;
               ctx = canvas.getContext("2d");
@@ -242,26 +253,31 @@
       }
 
       function targetDims(w, h) {
+        var t;
         if (state.resizeMode === "percent") {
           var k = state.percent / 100;
-          return { w: Math.round(w * k), h: Math.round(h * k) };
-        }
-        if (state.resizeMode === "custom") {
+          t = { w: Math.round(w * k), h: Math.round(h * k) };
+        } else if (state.resizeMode === "custom") {
           var rw = parseInt(state.rw, 10) || 0;
           var rh = parseInt(state.rh, 10) || 0;
-          if (rw <= 0 && rh <= 0) return { w: w, h: h };
-          if (state.lock) {
+          if (rw <= 0 && rh <= 0) {
+            t = { w: w, h: h };
+          } else if (state.lock) {
             if (rw > 0 && rh > 0) {
               var s = Math.min(rw / w, rh / h);   /* fit within the box */
-              return { w: Math.round(w * s), h: Math.round(h * s) };
+              t = { w: Math.round(w * s), h: Math.round(h * s) };
+            } else {
+              /* single value given: scale by it */
+              var k2 = rw > 0 ? rw / w : rh / h;
+              t = { w: Math.round(w * k2), h: Math.round(h * k2) };
             }
-            /* single value given: scale by it */
-            var k2 = rw > 0 ? rw / w : rh / h;
-            return { w: Math.round(w * k2), h: Math.round(h * k2) };
+          } else {
+            t = { w: rw > 0 ? rw : w, h: rh > 0 ? rh : h };
           }
-          return { w: rw > 0 ? rw : w, h: rh > 0 ? rh : h };
+        } else {
+          t = { w: w, h: h };
         }
-        return { w: w, h: h };
+        return clampArea(t.w, t.h); /* never exceed device canvas limits */
       }
 
       function renderResizeRow() {
