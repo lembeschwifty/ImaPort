@@ -65,6 +65,11 @@ Be aware of these before using ImaPort for critical work:
 - **Color profile and EXIF metadata are not preserved.** The conversion pipeline uses the Canvas API, which strips most metadata and does not apply ICC profile transforms.
 - **JPEG quality is approximate.** The quality slider maps to the browser encoder's internal scale; results differ slightly between browsers.
 - **Very large images**: canvas size limits vary per browser and device. ImaPort clamps both the decoded source and the resize target to 16.7 megapixels (4096x4096); larger requests are proportionally scaled down instead of failing or producing blank output.
+- **iPhone / iOS Safari quirks**:
+  - Older iOS versions do not support the dynamic viewport height unit; on those versions the page layout may look off after rotating to landscape (modern iOS is handled with `100dvh`).
+  - iOS Safari enforces a canvas area limit (~16.7 megapixels on many devices). The safeguard above scales oversized conversions down proportionally, but this means very large images may come out smaller than requested.
+  - iPhone photos in HEIC format cannot be decoded by Safari and are rejected; use the "Most Compatible" camera setting or convert elsewhere first.
+  - Downloads in Safari on iOS may save with the page's name instead of the converted filename; rename the file and add the `.png`, `.jpg`, or `.webp` extension.
 - **HEIC input** generally does not work, since most browsers cannot decode HEIC.
 - **ICO input** support depends on the browser; many browsers decode standard ICO files, but not all.
 
