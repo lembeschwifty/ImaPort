@@ -79,13 +79,6 @@ Be aware of these before using ImaPort for critical work:
 - JPG output composites onto a background color first, since JPEG has no alpha channel.
 - Works from `file://` - no server required.
 
-## Roadmap (ideas, not promises)
-
-- Resize/scale options before conversion
-- AVIF output via WASM encoder
-- PWA manifest for browser "install"
-- Optional HEIC decode via WASM
-
 ## License
 
 MIT - see [LICENSE](LICENSE).
