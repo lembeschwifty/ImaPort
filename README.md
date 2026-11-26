@@ -82,7 +82,3 @@ Be aware of these before using ImaPort for critical work:
 ## License
 
 MIT - see [LICENSE](LICENSE).
-
----
-
-Built by the League of Robots (Bender supervising; The Borax Kid architect; Clamps implementer; Tinny Tim tester; Robot Santa reviewer; URL security audit; Calculon UX; Malfunctioning Eddie QA; Flexo DevOps; Robot 1-X docs) for Lem B.
