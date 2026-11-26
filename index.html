@@ -48,6 +48,13 @@
         border-radius: 8px; background: transparent; cursor: pointer;
       }
       .bgtext { font-size: .75rem; color: #64748b; line-height: 1.35; }
+      input[type=number] {
+        width: 78px; padding: 8px; background: #0f172a; border: 1px solid #334155;
+        border-radius: 8px; color: #e2e8f0; font: inherit;
+      }
+      input[type=checkbox] { accent-color: #6366f1; width: 15px; height: 15px; cursor: pointer; }
+      .chk { display: flex; align-items: center; gap: 8px; font-size: .78rem; color: #cbd5e1; margin-top: 8px; }
+      .numlbl { margin: 0 4px; color: #64748b; }
       #list { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
       .item {
         display: flex; align-items: center; gap: 12px; padding: 12px 14px;
@@ -86,7 +93,7 @@
       <p class="sub">
         Portable image file converter. One self-contained HTML file: save it anywhere and open
         it in any browser, on any platform, even fully offline. Convert PNG, JPG, WEBP, GIF,
-        BMP, SVG and more to PNG, JPG or WEBP. Images never leave your device.
+        BMP, SVG and more to PNG, JPG or WEBP, with optional resizing. Images never leave your device.
       </p>
 
       <button id="drop" type="button">
@@ -115,6 +122,30 @@
         </div>
       </div>
 
+      <div class="settings">
+        <div>
+          <label>Resize</label>
+          <div class="fmtrow" id="rmoderow"></div>
+        </div>
+        <div id="rpercent-wrap">
+          <label>Scale: <span id="rperval">100%</span></label>
+          <input id="rpercent" type="range" min="10" max="400" value="100" />
+          <div class="hint">10% to 400% of original dimensions</div>
+        </div>
+        <div id="rcustom-wrap" hidden>
+          <label>Target size (px)</label>
+          <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+            <input id="rw" type="number" min="1" placeholder="W" />
+            <span class="numlbl">&times;</span>
+            <input id="rh" type="number" min="1" placeholder="H" />
+          </div>
+          <div class="chk">
+            <input id="rlock" type="checkbox" checked />
+            <span>Keep aspect ratio (fits within the box)</span>
+          </div>
+        </div>
+      </div>
+
       <div id="list"></div>
       <div class="actions" id="actions" hidden>
         <button id="convert" class="btn primary">Convert</button>
@@ -124,8 +155,9 @@
 
       <footer>
         Supported inputs: anything your browser can decode (PNG, JPG, WEBP, GIF, BMP, SVG,
-        AVIF where supported). Outputs: PNG (lossless), JPG and WEBP (quality control).
-        GIF input uses its first frame; animated output is not supported.
+        AVIF where supported). Outputs: PNG (lossless), JPG and WEBP (quality control),
+        with optional resize (percentage or exact dimensions). GIF input uses its first
+        frame; animated output is not supported.
       </footer>
     </div>
 
@@ -136,7 +168,16 @@
         { value: "image/jpeg", ext: "jpg",  label: "JPG",  lossless: false },
         { value: "image/webp", ext: "webp", label: "WEBP", lossless: false }
       ];
-      var state = { format: "image/jpeg", quality: 0.92, bg: "#ffffff", items: [], busy: false };
+      var state = {
+        format: "image/jpeg", quality: 0.92, bg: "#ffffff", items: [], busy: false,
+        resizeMode: "none", percent: 100, rw: "", rh: "", lock: true
+      };
+
+      var RMODES = [
+        { value: "none",    label: "Original" },
+        { value: "percent", label: "Scale %" },
+        { value: "custom",  label: "Custom px" }
+      ];
 
       var $ = function (id) { return document.getElementById(id); };
       var drop = $("drop"), picker = $("picker"), list = $("list");
@@ -185,6 +226,66 @@
           };
           img.src = url;
         });
+      }
+
+      /* ---------- resize ---------- */
+      function resizeCanvas(canvas, w, h) {
+        if (canvas.width === w && canvas.height === h) return canvas;
+        var out = document.createElement("canvas");
+        out.width = Math.max(1, Math.round(w));
+        out.height = Math.max(1, Math.round(h));
+        var ctx = out.getContext("2d");
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(canvas, 0, 0, out.width, out.height);
+        return out;
+      }
+
+      function targetDims(w, h) {
+        if (state.resizeMode === "percent") {
+          var k = state.percent / 100;
+          return { w: Math.round(w * k), h: Math.round(h * k) };
+        }
+        if (state.resizeMode === "custom") {
+          var rw = parseInt(state.rw, 10) || 0;
+          var rh = parseInt(state.rh, 10) || 0;
+          if (rw <= 0 && rh <= 0) return { w: w, h: h };
+          if (state.lock) {
+            if (rw > 0 && rh > 0) {
+              var s = Math.min(rw / w, rh / h);   /* fit within the box */
+              return { w: Math.round(w * s), h: Math.round(h * s) };
+            }
+            /* single value given: scale by it */
+            var k2 = rw > 0 ? rw / w : rh / h;
+            return { w: Math.round(w * k2), h: Math.round(h * k2) };
+          }
+          return { w: rw > 0 ? rw : w, h: rh > 0 ? rh : h };
+        }
+        return { w: w, h: h };
+      }
+
+      function renderResizeRow() {
+        var row = $("rmoderow");
+        row.innerHTML = "";
+        RMODES.forEach(function (m) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "fmt" + (state.resizeMode === m.value ? " sel" : "");
+          b.textContent = m.label;
+          b.onclick = function () {
+            state.resizeMode = m.value;
+            renderResizeRow();
+            syncResize();
+          };
+          row.appendChild(b);
+        });
+      }
+
+      function syncResize() {
+        $("rpercent-wrap").hidden = state.resizeMode !== "percent";
+        $("rcustom-wrap").hidden = state.resizeMode !== "custom";
+        $("rperval").textContent = state.percent + "%";
+        $("rpercent").value = state.percent;
       }
 
       /* ---------- encode ---------- */
@@ -330,13 +431,15 @@
           try {
             var dec = await loadImage(item.file);
             var f = outFmt();
+            var td = targetDims(dec.width, dec.height);
+            var src = resizeCanvas(dec.canvas, td.w, td.h);
             var blob = await convert(
-              dec.canvas, state.format,
+              src, state.format,
               f.lossless ? undefined : state.quality, state.bg
             );
             item.result = { blob: blob, name: baseName(item.file.name) + "." + f.ext };
             item.outSize = blob.size;
-            item.dims = { w: dec.width, h: dec.height };
+            item.dims = { w: td.w, h: td.h };
             item.status = "done";
             results.push(item.result);
           } catch (err) {
@@ -373,6 +476,14 @@
       });
       $("bg").addEventListener("input", function (e) { state.bg = e.target.value; });
 
+      $("rpercent").addEventListener("input", function (e) {
+        state.percent = Number(e.target.value);
+        syncResize();
+      });
+      $("rw").addEventListener("input", function (e) { state.rw = e.target.value; });
+      $("rh").addEventListener("input", function (e) { state.rh = e.target.value; });
+      $("rlock").addEventListener("change", function (e) { state.lock = e.target.checked; });
+
       $("convert").addEventListener("click", async function () {
         var results = await runAll();
         if (results.length === 1) download(results[0].blob, results[0].name);
@@ -388,6 +499,8 @@
 
       renderFormatRow();
       syncSettings();
+      renderResizeRow();
+      syncResize();
       render();
     </script>
   </body>

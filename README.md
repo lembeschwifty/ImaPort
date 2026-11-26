@@ -13,11 +13,12 @@ ImaPort is a portable, cross-platform image converter that lives in a **single H
 
 - Convert to **PNG**, **JPG**, or **WEBP**
 - Input: anything your browser can decode - PNG, JPG, WEBP, GIF, BMP, SVG, AVIF (where supported)
+- **Optional resize before conversion**: scale by percentage (10-400%) or set exact pixel dimensions, with a keep-aspect-ratio mode that fits the image within your box
 - **Batch conversion**: add many files, convert them all in one pass
 - **Quality slider** for lossy formats (JPG, WEBP), 10-100%
 - **Background color picker** for JPG output (JPG has no alpha channel, so transparent areas are filled)
 - Per-file **Download** buttons plus **Download all**
-- Shows original vs. converted file size and flags whether the output is smaller
+- Shows original vs. converted size and dimensions, and flags whether the output is smaller
 - Drag-and-drop or tap-to-browse; touch friendly
 - Dark, responsive UI that works on phones and desktops
 
@@ -44,6 +45,14 @@ Optional: host `index.html` on any static host (GitHub Pages, Netlify, a USB web
 
 * JPG has no transparency; transparent areas are filled with your chosen background color (default white).
 
+## Resizing
+
+Three modes, applied to every file in the batch:
+
+- **Original**: no resizing, dimensions are preserved.
+- **Scale %**: percentage slider from 10% to 400% of the original dimensions.
+- **Custom px**: enter width and/or height in pixels. With **Keep aspect ratio** on, both values act as a maximum bounding box (the image fits inside while preserving proportions); if you enter only one value, the other is computed. With it off, the exact dimensions you enter are used.
+
 ## Known Limitations
 
 Be aware of these before using ImaPort for critical work:
@@ -52,6 +61,7 @@ Be aware of these before using ImaPort for critical work:
 - **Animated GIF/WebP input uses only the first frame.** Animation is lost; ImaPort outputs static images.
 - **SVG input is rasterized** at up to 2048 px on its longest side. Converting to another vector format is not supported.
 - **AVIF support depends on the browser** (Chrome and recent Firefox can decode it; Safari support varies).
+- **Upscaling beyond 400%** is not offered in Scale mode (use Custom px for more), and upscaling never adds detail - the result is interpolated.
 - **Color profile and EXIF metadata are not preserved.** The conversion pipeline uses the Canvas API, which strips most metadata and does not apply ICC profile transforms.
 - **JPEG quality is approximate.** The quality slider maps to the browser encoder's internal scale; results differ slightly between browsers.
 - **Very large images** may fail on memory-constrained devices (e.g., big panoramas on old phones) because canvas size limits vary per browser.
@@ -69,13 +79,15 @@ Be aware of these before using ImaPort for critical work:
 
 - **"Browser could not decode this file"**: the image format is not supported by your browser (common with HEIC). Try a different browser or convert the file to PNG/JPG first.
 - **"Encoding failed"**: the browser refused to encode (rare). Try a different output format.
+- **Custom resize seems ignored**: if both W and H are empty, the original size is kept; with Keep aspect ratio on, your values are a maximum box, not exact output size.
 - **Downloaded file has no extension**: some mobile browsers save files by the page title; rename it and add `.png`, `.jpg`, or `.webp`.
 - **Output is larger than the original**: normal when converting a well-compressed JPG to PNG (lossless), or when raising the quality slider. Lower the quality or pick WEBP.
 
 ## Technical Notes
 
-- Single file: HTML + inline CSS + vanilla ES2017 JavaScript (~17 KB, no build step).
+- Single file: HTML + inline CSS + vanilla ES2017 JavaScript (~21 KB, no build step).
 - Decode via `Image` + object URLs; encode via `canvas.toBlob(mime, quality)`.
+- Resize (when enabled) runs as a high-quality image-smoothing pass on a second canvas before encoding.
 - JPG output composites onto a background color first, since JPEG has no alpha channel.
 - Works from `file://` - no server required.
 
