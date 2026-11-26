@@ -94,7 +94,8 @@
       <p class="sub">
         Portable image file converter. One self-contained HTML file: save it anywhere and open
         it in any browser, on any platform, even fully offline. Convert PNG, JPG, WEBP, GIF,
-        BMP, SVG and more to PNG, JPG or WEBP, with optional resizing. Images never leave your device.
+        BMP, SVG, HEIC and more to PNG, JPG or WEBP, with optional resizing. Images never
+        leave your device.
       </p>
 
       <button id="drop" type="button">
@@ -102,7 +103,7 @@
         <span class="t1">Drop images here, or tap to browse</span>
         <div class="t2">Multiple files supported. Everything runs locally in your browser.</div>
       </button>
-      <input id="picker" type="file" accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.svg,.avif,.ico" multiple hidden />
+      <input id="picker" type="file" accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp,.svg,.avif,.ico,.heic,.heif" multiple hidden />
 
       <div class="settings">
         <div>
@@ -127,6 +128,10 @@
         <div>
           <label>Resize</label>
           <div class="fmtrow" id="rmoderow"></div>
+        </div>
+        <div>
+          <label>Presets (fit within)</label>
+          <div class="fmtrow" id="presetrow"></div>
         </div>
         <div id="rpercent-wrap">
           <label>Scale: <span id="rperval">100%</span></label>
@@ -156,9 +161,10 @@
 
       <footer>
         Supported inputs: anything your browser can decode (PNG, JPG, WEBP, GIF, BMP, SVG,
-        AVIF where supported). Outputs: PNG (lossless), JPG and WEBP (quality control),
-        with optional resize (percentage or exact dimensions). GIF input uses its first
-        frame; animated output is not supported.
+        AVIF where supported), plus HEIC/HEIF via an optional decoder that downloads on
+        first use. Outputs: PNG (lossless), JPG and WEBP (quality control), with optional
+        resize (presets, percentage, or exact dimensions). GIF input uses its first frame;
+        animated output is not supported.
       </footer>
     </div>
 
@@ -171,13 +177,20 @@
       ];
       var state = {
         format: "image/jpeg", quality: 0.92, bg: "#ffffff", items: [], busy: false,
-        resizeMode: "none", percent: 100, rw: "", rh: "", lock: true
+        resizeMode: "none", percent: 100, rw: "", rh: "", lock: true, presetSel: -1
       };
 
       var RMODES = [
         { value: "none",    label: "Original" },
         { value: "percent", label: "Scale %" },
         { value: "custom",  label: "Custom px" }
+      ];
+
+      var PRESETS = [
+        { label: "256",  v: 256 },
+        { label: "1280", v: 1280 },
+        { label: "1080", v: 1080 },
+        { label: "1440", v: 1440 }
       ];
 
       var $ = function (id) { return document.getElementById(id); };
@@ -205,10 +218,33 @@
         return { w: Math.max(1, Math.floor(w * s)), h: Math.max(1, Math.floor(h * s)) };
       }
 
+      /* ---------- HEIC (optional decoder, loaded only on first HEIC use) ---------- */
+      var HEIC_URL = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";
+      var heicLibPromise = null;
+      function isHeic(file) {
+        return /^image\/hei[cf]/.test(file.type) || /\.(heic|heif)$/i.test(file.name);
+      }
+      function loadHeicLib() {
+        if (window.heic2any) return Promise.resolve();
+        if (!heicLibPromise) {
+          heicLibPromise = new Promise(function (resolve, reject) {
+            var s = document.createElement("script");
+            s.src = HEIC_URL;
+            s.onload = resolve;
+            s.onerror = function () {
+              heicLibPromise = null;
+              reject(new Error("HEIC decoder could not load (internet needed once)"));
+            };
+            document.head.appendChild(s);
+          });
+        }
+        return heicLibPromise;
+      }
+
       /* ---------- decode ---------- */
-      function loadImage(file) {
+      function decodeViaURL(blob, file) {
         return new Promise(function (resolve, reject) {
-          var url = URL.createObjectURL(file);
+          var url = URL.createObjectURL(blob);
           var img = new Image();
           img.onload = function () {
             var w, h, canvas, ctx;
@@ -237,6 +273,16 @@
           };
           img.src = url;
         });
+      }
+
+      async function loadImage(file) {
+        if (isHeic(file)) {
+          await loadHeicLib();
+          var out = await window.heic2any({ blob: file, toType: "image/png" });
+          var png = Array.isArray(out) ? out[0] : out;
+          return decodeViaURL(png, file);
+        }
+        return decodeViaURL(file, file);
       }
 
       /* ---------- resize ---------- */
@@ -290,6 +336,7 @@
           b.textContent = m.label;
           b.onclick = function () {
             state.resizeMode = m.value;
+            if (m.value !== "custom") { state.presetSel = -1; renderPresetRow(); }
             renderResizeRow();
             syncResize();
           };
@@ -302,6 +349,31 @@
         $("rcustom-wrap").hidden = state.resizeMode !== "custom";
         $("rperval").textContent = state.percent + "%";
         $("rpercent").value = state.percent;
+        if (state.resizeMode === "custom") {
+          $("rw").value = state.rw;
+          $("rh").value = state.rh;
+        }
+      }
+
+      function renderPresetRow() {
+        var row = $("presetrow");
+        row.innerHTML = "";
+        PRESETS.forEach(function (p, i) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "fmt" + (state.presetSel === i ? " sel" : "");
+          b.textContent = p.label;
+          b.onclick = function () {
+            state.resizeMode = "custom";
+            state.presetSel = i;
+            state.rw = String(p.v);
+            state.rh = String(p.v);
+            renderResizeRow();
+            renderPresetRow();
+            syncResize();
+          };
+          row.appendChild(b);
+        });
       }
 
       /* ---------- encode ---------- */
@@ -335,7 +407,7 @@
       function addFiles(fileList) {
         Array.prototype.forEach.call(fileList, function (f) {
           if (!(f.type && f.type.indexOf("image/") === 0) &&
-              !/\.(png|jpe?g|webp|gif|bmp|svg|avif|ico)$/i.test(f.name)) return;
+              !/\.(png|jpe?g|webp|gif|bmp|svg|avif|ico|hei[cf])$/i.test(f.name)) return;
           state.items.push({
             file: f, status: "ready", result: null, outSize: null, dims: null, error: null
           });
@@ -496,8 +568,8 @@
         state.percent = Number(e.target.value);
         syncResize();
       });
-      $("rw").addEventListener("input", function (e) { state.rw = e.target.value; });
-      $("rh").addEventListener("input", function (e) { state.rh = e.target.value; });
+      $("rw").addEventListener("input", function (e) { state.rw = e.target.value; state.presetSel = -1; renderPresetRow(); });
+      $("rh").addEventListener("input", function (e) { state.rh = e.target.value; state.presetSel = -1; renderPresetRow(); });
       $("rlock").addEventListener("change", function (e) { state.lock = e.target.checked; });
 
       $("convert").addEventListener("click", async function () {
@@ -516,6 +588,7 @@
       renderFormatRow();
       syncSettings();
       renderResizeRow();
+      renderPresetRow();
       syncResize();
       render();
     </script>
