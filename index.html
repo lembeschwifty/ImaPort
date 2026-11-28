@@ -17,9 +17,16 @@
       .wrap { max-width: 780px; margin: 0 auto; padding: 32px 16px 48px; }
       h1 { font-size: clamp(1.6rem, 4vw, 2.3rem); font-weight: 700; letter-spacing: -0.02em; }
       .sub { margin-top: 8px; color: #94a3b8; font-size: 0.95rem; line-height: 1.5; }
+      :focus-visible { outline: 2px solid #818cf8; outline-offset: 2px; }
+      .visually-hidden {
+        position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+        overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
+        white-space: nowrap; border: 0;
+      }
       #drop {
         margin-top: 24px; width: 100%; padding: 44px 20px; text-align: center;
-        border: 2px dashed #334155; border-radius: 16px; background: rgba(15,23,42,.55);
+        border: 2px dashed #64748b; /* WCAG 1.4.11: >=3:1 against the dark background */
+        border-radius: 16px; background: rgba(15,23,42,.55);
         color: inherit; font: inherit; cursor: pointer; transition: border-color .15s, background .15s;
       }
       #drop:hover, #drop.over { border-color: #818cf8; background: rgba(99,102,241,.08); }
@@ -40,7 +47,8 @@
         transition: background .15s;
       }
       .fmt:hover { background: #334155; }
-      .fmt.sel { background: #6366f1; color: #fff; }
+      .fmt.sel { background: #4f46e5; color: #fff; } /* WCAG 1.4.3: 6.3:1, not 4.5:1 at #6366f1 */
+      .fmt:disabled { cursor: not-allowed; }
       input[type=range] { width: 100%; accent-color: #6366f1; cursor: pointer; }
       .hint { font-size: .72rem; color: #94a3b8; margin-top: 5px; line-height: 1.4; }
       .bgrow { display: flex; align-items: center; gap: 10px; }
@@ -56,27 +64,39 @@
       input[type=checkbox] { accent-color: #6366f1; width: 20px; height: 20px; flex: none; cursor: pointer; }
       .chk { display: flex; align-items: center; gap: 8px; font-size: .78rem; color: #cbd5e1; margin-top: 8px; cursor: pointer; }
       .numlbl { margin: 0 4px; color: #94a3b8; }
+      #live-wrap { margin-top: 20px; }
       #list { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
       .item {
         display: flex; align-items: center; gap: 12px; padding: 12px 14px;
         background: rgba(15,23,42,.6); border: 1px solid #1e293b; border-radius: 12px;
       }
+      .thumb {
+        width: 40px; height: 40px; border-radius: 8px; object-fit: cover; flex: none;
+        background: #0f172a;
+      }
       .item .meta { flex: 1; min-width: 0; }
       .item .name { font-weight: 500; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .item .info { font-size: .74rem; color: #94a3b8; margin-top: 3px; }
       .info .ok { color: #34d399; } .info .warn { color: #fbbf24; } .info .err { color: #f87171; }
-      .status { font-size: .8rem; }
+      .status {
+        font-size: .8rem; min-height: 38px; /* reserve space so buttons appearing don't shift layout */
+        display: flex; align-items: center; justify-content: flex-end;
+      }
       .status.working { color: #a5b4fc; }
       .status .err { color: #f87171; }
       .btn {
         padding: 8px 16px; border: none; border-radius: 9px; cursor: pointer;
         font-weight: 600; font-size: .82rem; color: #fff;
       }
-      .btn.primary { background: #6366f1; } .btn.primary:hover { background: #818cf8; }
-      .btn.green { background: #059669; } .btn.green:hover { background: #10b981; }
+      .btn.primary { background: #4f46e5; } .btn.primary:hover { background: #4338ca; } /* WCAG 1.4.3 */
+      .btn.green { background: #047857; } .btn.green:hover { background: #065f46; } /* WCAG 1.4.3: 5.5:1 */
       .btn.ghost { background: #1e293b; color: #e2e8f0; } .btn.ghost:hover { background: #334155; }
       .btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
-      .actions { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px; }
+      .actions {
+        margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px;
+        min-height: 54px; /* space reserved up front: no layout shift when actions appear */
+      }
+      .actions.off { visibility: hidden; }
       .actions .btn { flex: 1 1 140px; padding: 12px 0; font-size: .9rem; }
       .del {
         background: none; border: none; color: #94a3b8; font-size: 1.25rem;
@@ -84,9 +104,14 @@
         min-width: 44px; min-height: 44px; margin: -10px -12px; /* WCAG 2.5.8: 44px target, no visual bloat */
       }
       .del:hover { color: #f87171; }
+      .del:disabled { cursor: not-allowed; }
       footer { margin-top: 36px; font-size: .72rem; color: #94a3b8; line-height: 1.6; }
       .spin { display: inline-block; animation: pulse 1.1s ease-in-out infinite; }
       @keyframes pulse { 50% { opacity: .35; } }
+      @media (prefers-reduced-motion: reduce) {
+        .spin { animation: none; } /* "Converting…" text still conveys the state */
+        #drop { transition: none; }
+      }
     </style>
   </head>
   <body>
@@ -100,7 +125,7 @@
       </p>
 
       <button id="drop" type="button">
-        <span class="icon">🖼️</span>
+        <span class="icon" aria-hidden="true">🖼️</span>
         <span class="t1">Drop images here, or tap to browse</span>
         <div class="t2">Multiple files supported. Everything runs locally in your browser.</div>
       </button>
@@ -109,7 +134,7 @@
       <div class="settings">
         <div>
           <label>Output format</label>
-          <div class="fmtrow" id="fmtrow"></div>
+          <div class="fmtrow" id="fmtrow" role="group" aria-label="Output format"></div>
         </div>
         <div>
           <label>Quality: <span id="qval">92%</span></label>
@@ -128,11 +153,11 @@
       <div class="settings">
         <div>
           <label>Resize</label>
-          <div class="fmtrow" id="rmoderow"></div>
+          <div class="fmtrow" id="rmoderow" role="group" aria-label="Resize mode"></div>
         </div>
         <div>
           <label>Presets (fit within)</label>
-          <div class="fmtrow" id="presetrow"></div>
+          <div class="fmtrow" id="presetrow" role="group" aria-label="Resize presets (fit within)"></div>
         </div>
         <div id="rpercent-wrap">
           <label>Scale: <span id="rperval">100%</span></label>
@@ -153,8 +178,9 @@
         </div>
       </div>
 
+      <div id="live-wrap"><div id="live" class="visually-hidden" role="status" aria-live="polite"></div></div>
       <div id="list"></div>
-      <div class="actions" id="actions" hidden>
+      <div class="actions off" id="actions">
         <button id="convert" class="btn primary">Convert</button>
         <button id="dlall" class="btn green" hidden>Download all</button>
         <button id="clear" class="btn ghost">Clear</button>
@@ -210,6 +236,7 @@
         for (var i = 0; i < FORMATS.length; i++)
           if (FORMATS[i].value === state.format) return FORMATS[i];
       }
+      function live(msg) { $("live").textContent = msg; }
 
       /* iOS Safari and older devices fail silently on canvases above this area */
       var MAX_AREA = 16777216; /* 4096 x 4096 */
@@ -299,20 +326,20 @@
         return out;
       }
 
-      function targetDims(w, h) {
+      function targetDims(w, h, s) {
         var t;
-        if (state.resizeMode === "percent") {
-          var k = state.percent / 100;
+        if (s.resizeMode === "percent") {
+          var k = s.percent / 100;
           t = { w: Math.round(w * k), h: Math.round(h * k) };
-        } else if (state.resizeMode === "custom") {
-          var rw = parseInt(state.rw, 10) || 0;
-          var rh = parseInt(state.rh, 10) || 0;
+        } else if (s.resizeMode === "custom") {
+          var rw = parseInt(s.rw, 10) || 0;
+          var rh = parseInt(s.rh, 10) || 0;
           if (rw <= 0 && rh <= 0) {
             t = { w: w, h: h };
-          } else if (state.lock) {
+          } else if (s.lock) {
             if (rw > 0 && rh > 0) {
-              var s = Math.min(rw / w, rh / h);   /* fit within the box */
-              t = { w: Math.round(w * s), h: Math.round(h * s) };
+              var sc = Math.min(rw / w, rh / h);   /* fit within the box */
+              t = { w: Math.round(w * sc), h: Math.round(h * sc) };
             } else {
               /* single value given: scale by it */
               var k2 = rw > 0 ? rw / w : rh / h;
@@ -335,6 +362,8 @@
           b.type = "button";
           b.className = "fmt" + (state.resizeMode === m.value ? " sel" : "");
           b.textContent = m.label;
+          b.disabled = state.busy;
+          b.setAttribute("aria-pressed", state.resizeMode === m.value ? "true" : "false");
           b.onclick = function () {
             state.resizeMode = m.value;
             if (m.value !== "custom") { state.presetSel = -1; renderPresetRow(); }
@@ -364,6 +393,8 @@
           b.type = "button";
           b.className = "fmt" + (state.presetSel === i ? " sel" : "");
           b.textContent = p.label;
+          b.disabled = state.busy;
+          b.setAttribute("aria-pressed", state.presetSel === i ? "true" : "false");
           b.onclick = function () {
             state.resizeMode = "custom";
             state.presetSel = i;
@@ -410,7 +441,8 @@
           if (!(f.type && f.type.indexOf("image/") === 0) &&
               !/\.(png|jpe?g|webp|gif|bmp|svg|avif|ico|hei[cf])$/i.test(f.name)) return;
           state.items.push({
-            file: f, status: "ready", result: null, outSize: null, dims: null, error: null
+            file: f, status: "ready", result: null, outSize: null, dims: null, error: null,
+            thumb: URL.createObjectURL(f)
           });
         });
         render();
@@ -424,6 +456,8 @@
           b.type = "button";
           b.className = "fmt" + (state.format === f.value ? " sel" : "");
           b.textContent = f.label;
+          b.disabled = state.busy;
+          b.setAttribute("aria-pressed", state.format === f.value ? "true" : "false");
           b.onclick = function () { state.format = f.value; renderFormatRow(); syncSettings(); };
           row.appendChild(b);
         });
@@ -431,72 +465,107 @@
 
       function syncSettings() {
         var f = outFmt();
-        $("qslider").disabled = f.lossless;
+        $("qslider").disabled = state.busy || f.lossless;
         $("qval").textContent = Math.round(state.quality * 100) + "%";
         $("qhint").textContent = f.lossless
           ? "PNG is lossless, quality does not apply"
           : "Higher = better quality, larger file";
         var isJpg = state.format === "image/jpeg";
-        $("bg").disabled = !isJpg;
+        $("bg").disabled = state.busy || !isJpg;
         $("bgtext").textContent = isJpg
           ? "Fills transparent areas, since JPG has no transparency"
           : "Not needed";
       }
 
-      function render() {
-        list.innerHTML = "";
-        state.items.forEach(function (item, idx) {
-          var row = document.createElement("div");
-          row.className = "item";
+      /* Disable/enable every setting control for the busy state, so a run
+         can never be altered mid-flight. Called at run start and end. */
+      function syncBusy() {
+        $("rpercent").disabled = state.busy;
+        $("rw").disabled = state.busy;
+        $("rh").disabled = state.busy;
+        $("rlock").disabled = state.busy;
+        renderFormatRow();
+        renderResizeRow();
+        renderPresetRow();
+        syncSettings();
+      }
 
-          var meta = document.createElement("div");
-          meta.className = "meta";
-          var name = document.createElement("div");
-          name.className = "name";
-          name.textContent = item.file.name;
-          var info = document.createElement("div");
-          info.className = "info";
-          var html = fmtBytes(item.file.size);
-          if (item.dims) html += " \u00b7 " + item.dims.w + "\u00d7" + item.dims.h;
-          if (item.status === "done") {
-            var smaller = item.outSize < item.file.size;
-            html += ' \u2192 ' + fmtBytes(item.outSize) + " (" + outFmt().label + ")" +
-              (smaller ? ' <span class="ok">\u2713 smaller</span>'
-                       : ' <span class="warn">(larger than original)</span>');
-          }
-          if (item.status === "error") html += ' <span class="err">\u00b7 ' + item.error + "</span>";
-          info.innerHTML = html;
-          meta.appendChild(name); meta.appendChild(info);
+      /* Build one list row; updateItem() patches it without rebuilding the
+         list, so focus is never destroyed mid-run. */
+      function itemRow(item, idx) {
+        var row = document.createElement("div");
+        row.className = "item";
 
-          var status = document.createElement("div");
-          status.className = "status " + (item.status === "working" ? "working" : "");
-          if (item.status === "working") {
-            status.innerHTML = '<span class="spin">Converting\u2026</span>';
-          } else if (item.status === "done") {
-            var db = document.createElement("button");
-            db.type = "button"; db.className = "btn primary"; db.textContent = "Download";
-            db.onclick = (function (it) {
-              return function () { download(it.result.blob, it.result.name); };
-            })(item);
-            status.appendChild(db);
-          } else if (item.status === "error") {
-            status.textContent = "Failed";
-          }
+        var thumb = document.createElement("img");
+        thumb.className = "thumb";
+        thumb.alt = ""; /* decorative: the file name is shown in text */
+        thumb.src = item.thumb;
+        row.appendChild(thumb);
 
-          var del = document.createElement("button");
-          del.type = "button"; del.className = "del";
-          del.title = "Remove"; del.textContent = "\u00d7";
-          del.setAttribute("aria-label", "Remove " + item.file.name);
-          del.onclick = (function (i) {
-            return function () { state.items.splice(i, 1); render(); };
-          })(idx);
+        var meta = document.createElement("div");
+        meta.className = "meta";
+        var name = document.createElement("div");
+        name.className = "name";
+        name.textContent = item.file.name;
+        var info = document.createElement("div");
+        info.className = "info";
+        meta.appendChild(name); meta.appendChild(info);
 
-          row.appendChild(meta); row.appendChild(status); row.appendChild(del);
-          list.appendChild(row);
-        });
+        var status = document.createElement("div");
+        status.className = "status";
 
+        var del = document.createElement("button");
+        del.type = "button"; del.className = "del";
+        del.title = "Remove"; del.textContent = "\u00d7";
+        del.setAttribute("aria-label", "Remove " + item.file.name);
+        del.disabled = state.busy;
+        del.onclick = (function (i) {
+          return function () {
+            if (state.busy) return; /* item indices must stay stable while a run iterates */
+            var it = state.items[i];
+            if (it && it.thumb) URL.revokeObjectURL(it.thumb);
+            state.items.splice(i, 1); render();
+          };
+        })(idx);
+
+        row.appendChild(meta); row.appendChild(status); row.appendChild(del);
+        item.el = row; item.infoEl = info; item.statusEl = status;
+        updateItem(item);
+        return row;
+      }
+
+      function updateItem(item) {
+        var html = fmtBytes(item.file.size);
+        if (item.dims) html += " \u00b7 " + item.dims.w + "\u00d7" + item.dims.h;
+        if (item.status === "done") {
+          var smaller = item.outSize < item.file.size;
+          html += ' <span aria-hidden="true">\u2192</span> ' + fmtBytes(item.outSize) + " (" + outFmt().label + ")" +
+            (smaller ? ' <span class="ok" aria-hidden="true">\u2713</span> smaller'
+                     : ' <span class="warn">(larger than original)</span>');
+        }
+        if (item.status === "error") html += ' <span class="err">\u00b7 ' + item.error + "</span>";
+        item.infoEl.innerHTML = html;
+
+        var status = item.statusEl;
+        status.className = "status " + (item.status === "working" ? "working" : "");
+        status.innerHTML = "";
+        if (item.status === "working") {
+          status.innerHTML = '<span class="spin">Converting\u2026</span>';
+        } else if (item.status === "done") {
+          var db = document.createElement("button");
+          db.type = "button"; db.className = "btn primary"; db.textContent = "Download";
+          db.onclick = (function (it) {
+            return function () { download(it.result.blob, it.result.name); };
+          })(item);
+          status.appendChild(db);
+        } else if (item.status === "error") {
+          status.textContent = "Failed";
+        }
+      }
+
+      function updateActions() {
         var doneCount = state.items.filter(function (i) { return i.status === "done"; }).length;
-        $("actions").hidden = state.items.length === 0;
+        $("actions").classList.toggle("off", state.items.length === 0);
         $("convert").disabled = state.busy;
         $("convert").textContent = state.busy
           ? "Converting\u2026"
@@ -506,40 +575,63 @@
         $("clear").disabled = state.busy;
       }
 
+      function render() {
+        list.innerHTML = "";
+        state.items.forEach(function (item, idx) {
+          list.appendChild(itemRow(item, idx));
+        });
+        updateActions();
+      }
+
       async function runAll() {
         state.busy = true;
+        /* Snapshot the settings the user approved for this run, so nothing
+           can change them mid-flight and produce mixed outputs. */
+        var settings = {
+          format: state.format, quality: state.quality, bg: state.bg,
+          resizeMode: state.resizeMode, percent: state.percent,
+          rw: state.rw, rh: state.rh, lock: state.lock
+        };
+        var fmt = null;
+        for (var j = 0; j < FORMATS.length; j++)
+          if (FORMATS[j].value === settings.format) fmt = FORMATS[j];
         state.items.forEach(function (i) {
           i.status = "ready"; i.error = null; i.result = null; i.outSize = null; i.dims = null;
         });
+        syncBusy();
         render();
-        var results = [];
+        var ok = 0, failed = 0, total = state.items.length;
         for (var i = 0; i < state.items.length; i++) {
           var item = state.items[i];
           item.status = "working";
-          render();
+          updateItem(item);
+          live("Converting " + (i + 1) + " of " + total + "\u2026");
           try {
             var dec = await loadImage(item.file);
-            var f = outFmt();
-            var td = targetDims(dec.width, dec.height);
+            var td = targetDims(dec.width, dec.height, settings);
             var src = resizeCanvas(dec.canvas, td.w, td.h);
             var blob = await convert(
-              src, state.format,
-              f.lossless ? undefined : state.quality, state.bg
+              src, settings.format,
+              fmt.lossless ? undefined : settings.quality, settings.bg
             );
-            item.result = { blob: blob, name: baseName(item.file.name) + "." + f.ext };
+            item.result = { blob: blob, name: baseName(item.file.name) + "." + fmt.ext };
             item.outSize = blob.size;
             item.dims = { w: td.w, h: td.h };
             item.status = "done";
-            results.push(item.result);
+            ok++;
           } catch (err) {
             item.status = "error";
             item.error = err && err.message ? err.message : "Unknown error";
+            failed++;
           }
-          render();
+          updateItem(item);
         }
         state.busy = false;
-        render();
-        return results;
+        syncBusy();
+        render(); /* full rebuild: re-enables per-row controls (remove) disabled during the run */
+        live(failed === 0
+          ? "Done: " + ok + " image" + (ok === 1 ? "" : "s") + " converted"
+          : "Done: " + ok + " converted, " + failed + " failed");
       }
 
       /* ---------- wire up ---------- */
@@ -585,7 +677,10 @@
           await new Promise(function (r) { setTimeout(r, 250); });
         }
       });
-      $("clear").addEventListener("click", function () { state.items = []; render(); });
+      $("clear").addEventListener("click", function () {
+        state.items.forEach(function (i) { if (i.thumb) URL.revokeObjectURL(i.thumb); });
+        state.items = []; render();
+      });
 
       renderFormatRow();
       syncSettings();
